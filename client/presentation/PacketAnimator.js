@@ -1,12 +1,11 @@
 import { ANIMATION } from '../domain/constants.js';
 
 class PacketAnimator {
-  constructor({ getPosition, getNode, onDraw, onComplete, onSpecialNodeReached }) {
+  constructor({ getPosition, getNode, onDraw, onComplete }) {
     this.getPosition = getPosition;
     this.getNode = getNode || (() => null);
     this.onDraw = onDraw;
     this.onComplete = onComplete || (() => {});
-    this.onSpecialNodeReached = onSpecialNodeReached || (() => {});
     this.packets = [];
     this.dnsQueries = [];
     this.animId = null;
@@ -59,15 +58,6 @@ class PacketAnimator {
       if (pkt.edgeIdx >= pkt.path.length - 1) {
         this._finishPacket(pkt);
         continue;
-      }
-
-      const currentNodeId = pkt.path[pkt.edgeIdx + 1];
-      if (currentNodeId !== pkt.lastVisitedNodeId) {
-        pkt.lastVisitedNodeId = currentNodeId;
-        const node = this.getNode(currentNodeId);
-        if (node && node.type && node.type !== 'client') {
-          this.onSpecialNodeReached(node);
-        }
       }
 
       const a = this.getPosition(pkt.path[pkt.edgeIdx]);

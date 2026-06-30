@@ -1,7 +1,9 @@
-import { drawNodeByType, drawPacket, drawDnsPacket, isDark } from './NodeRenderer.js';
 import { getThemeColors } from '../domain/ThemeColors.js';
 import { PacketAnimator } from './PacketAnimator.js';
 import { NODE_TYPE_INFO } from '../domain/NodeTypes.js';
+import { drawTopology as drawTopologyShared } from './drawTopologyShared.js';
+import { NodeLogStore } from './NodeLogStore.js';
+import { NodeLogPopover } from './NodeLogPopover.js';
 
 class CanvasRenderer {
   constructor(canvasAdapter, camera, network) {
@@ -11,13 +13,14 @@ class CanvasRenderer {
     this.onAnimationComplete = null;
     this.hoveredNode = null;
     this.tooltip = null;
+    this.nodeLog = new NodeLogStore();
+    this.popover = new NodeLogPopover();
 
     this.animator = new PacketAnimator({
       getPosition: (id) => this.network.getNode(id),
       getNode: (id) => this.network.getNode(id),
       onDraw: () => this.draw(),
       onComplete: () => { if (this.onAnimationComplete) this.onAnimationComplete(); },
-      onSpecialNodeReached: (node) => this.onSpecialNodeReached(node),
     });
 
     this._setupTooltip();
@@ -38,6 +41,7 @@ class CanvasRenderer {
 
     this.canvas.canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
     this.canvas.canvas.addEventListener('mouseleave', () => this._onMouseLeave());
+    this.canvas.canvas.addEventListener('click', (e) => this._onCanvasClick(e));
   }
 
   _onMouseMove(e) {
@@ -67,21 +71,6 @@ class CanvasRenderer {
     this.tooltip.classList.add('hidden');
   }
 
-  onSpecialNodeReached(node) {
-    const info = NODE_TYPE_INFO[node.type];
-    if (!info) return;
-
-    const notification = document.createElement('div');
-    notification.className = 'special-node-notification';
-    notification.innerHTML = `<strong>${info.label}</strong>: ${info.description}`;
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-      notification.classList.add('fade-out');
-      setTimeout(() => notification.remove(), 500);
-    }, 2000);
-  }
-
   pal() {
     return getThemeColors();
   }
@@ -91,25 +80,29 @@ class CanvasRenderer {
     const net = this.network;
     const ctx = this.canvas.ctx;
 
+    const outer = this.canvas.outer;
+    const rect = outer.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = rect.width;
+    const h = rect.height;
+
+    if (w !== cam.width || h !== cam.height) {
+      const bw = Math.round(w * dpr);
+      const bh = Math.round(h * dpr);
+      cam.setSize(bw / dpr, bh / dpr, dpr);
+      this.canvas.setSize(bw, bh);
+      this.canvas.setStyleSize(bw / dpr, bh / dpr);
+      this.canvas.setTransform(dpr);
+    }
+
     if (!cam.width || !cam.height) return;
 
     const c = this.pal();
-    const nr = net.nodeR();
 
-    ctx.clearRect(0, 0, cam.width, cam.height);
-    ctx.fillStyle = c.bg;
-    ctx.fillRect(0, 0, cam.width, cam.height);
-
-    ctx.save();
-    ctx.translate(cam.offsetX, cam.offsetY);
-    ctx.scale(cam.scale, cam.scale);
-
-    this.drawGrid(ctx, cam, c);
-    this.drawEdges(ctx, cam, net, c);
-    this.drawNodes(ctx, cam, net, c, nr);
-    this.drawPackets(ctx, cam);
-
-    ctx.restore();
+    drawTopologyShared(ctx, cam, net.nodes, net.edges, {
+      animator: this.animator,
+      theme: c,
+    });
   }
 
   drawGrid(ctx, cam, c) {
@@ -192,6 +185,21 @@ class CanvasRenderer {
         drawDnsPacket(ctx, q.pos.x, q.pos.y, dnsPr, cam.scale);
       }
     }
+  }
+
+  _onCanvasClick(e) {
+    const rect = this.canvas.canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    const nodeId = this.network.getNodeAt(sx, sy);
+    if (nodeId === null) return;
+
+    const node = this.network.getNode(nodeId);
+    if (!node || !node.type || node.type === 'client') return;
+
+    const entries = this.nodeLog.get(nodeId);
+    this.popover.show(node.name, node.type, entries, e.clientX, e.clientY);
   }
 
   animatePacket(path) {

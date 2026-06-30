@@ -190,6 +190,12 @@ class App {
         };
         this.renderer.animatePacket(data.path);
       }
+      if (data.nodeLogs && this.renderer) {
+        console.log('[App] nodeLogs recibidos:', data.nodeLogs.length);
+        for (const entry of data.nodeLogs) {
+          this.renderer.nodeLog.add(entry.nodeId, entry.text, entry.type, entry.timestamp);
+        }
+      }
     };
 
     this.client.onReceiveMessage = (data) => {
@@ -231,9 +237,11 @@ class App {
     const rect = outer.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
-    this.camera.setSize(rect.width, rect.height, dpr);
-    this.canvasAdapter.setSize(Math.round(rect.width * dpr), Math.round(rect.height * dpr));
-    this.canvasAdapter.setStyleSize(rect.width, rect.height);
+    const bw = Math.round(rect.width * dpr);
+    const bh = Math.round(rect.height * dpr);
+    this.camera.setSize(bw / dpr, bh / dpr, dpr);
+    this.canvasAdapter.setSize(bw, bh);
+    this.canvasAdapter.setStyleSize(bw / dpr, bh / dpr);
     this.canvasAdapter.setTransform(dpr);
 
     this.network.assignPositions();

@@ -1,4 +1,4 @@
-import { isDark } from '../domain/ThemeColors.js';
+import { isDark, getThemeColors } from '../domain/ThemeColors.js';
 
 function drawNode(ctx, node, x, y, radius, colors, scale = 1) {
   const { nodeActive, nodeActiveBr, nodeOff, nodeOffBr, nodeMe, nodeMeBr, lblOn, lblOff } = colors;

@@ -160,19 +160,26 @@ class SocketServer {
 
         room.logMessage(sender.id, receiver.id, data.text);
 
-        this.io.to(room.code).emit('packet', {
-          from: sender.id,
-          to: receiver.id,
-          path: path,
-          text: data.text,
-        });
+        const specialNodes = path
+          .map(id => room.getNode(id))
+          .filter(n => n && n.type && n.type !== 'client')
+          .map(n => ({ id: n.id, type: n.type, name: n.name }));
 
-        this.io.to(room.teacherSocketId).emit('packet', {
+        let nodeLogs = [];
+        try { nodeLogs = this._generateNodeLogs(room, path, sender.name, receiver.name); } catch (e) { console.error('[Server] nodeLogs error:', e); }
+        console.log('[Server] nodeLogs generados:', nodeLogs.length);
+
+        const packetData = {
           from: sender.id,
           to: receiver.id,
           path: path,
           text: data.text,
-        });
+          specialNodes,
+          nodeLogs,
+        };
+
+        this.io.to(room.code).emit('packet', packetData);
+        this.io.to(room.teacherSocketId).emit('packet', packetData);
 
         this.io.to(receiver.socketId).emit('receive-message', {
           from: sender.id,
@@ -275,6 +282,60 @@ class SocketServer {
         }
       });
     });
+  }
+
+  _generateNodeLogs(room, path, fromName, toName) {
+    const logs = [];
+    const base = Date.now();
+    let offset = 0;
+
+    const routerCentral = path
+      .map(id => room.getNode(id))
+      .find(n => n && n.type === 'router' && n.subnetId === null);
+    const dns = path
+      .map(id => room.getNode(id))
+      .find(n => n && n.type === 'dns');
+    const destNode = room.getNode(path[path.length - 1]);
+
+    for (let i = 0; i < path.length - 1; i++) {
+      const currId = path[i];
+      const nextId = path[i + 1];
+      const curr = room.getNode(currId);
+      const next = room.getNode(nextId);
+      if (!curr || !next) continue;
+
+      if (curr.type !== 'client' && curr.type !== 'router') {
+        logs.push({ nodeId: currId, text: `Reenviando a ${next.name} (${fromName} → ${toName})`, type: curr.type, timestamp: base + offset });
+        offset += 100;
+      }
+
+      if (next.type === 'client') continue;
+
+      if (next.type === 'firewall') {
+        logs.push({ nodeId: nextId, text: `Paquete permitido: ${fromName} → ${toName}`, type: next.type, timestamp: base + offset });
+        offset += 100;
+      } else if (routerCentral && next.id === routerCentral.id) {
+        logs.push({ nodeId: nextId, text: `Paquete recibido de ${fromName} con destino a ${toName}`, type: next.type, timestamp: base + offset });
+        offset += 100;
+        logs.push({ nodeId: nextId, text: `Consulta DNS enviada para resolver ${toName}`, type: next.type, timestamp: base + offset });
+        offset += 100;
+
+        if (dns && destNode) {
+          logs.push({ nodeId: dns.id, text: `${toName} = ${destNode.label} (${destNode.name})`, type: dns.type, timestamp: base + offset });
+          offset += 100;
+        }
+
+        logs.push({ nodeId: nextId, text: 'Respuesta DNS recibida', type: next.type, timestamp: base + offset });
+        offset += 100;
+        logs.push({ nodeId: nextId, text: `Reenviando paquete a ${toName}`, type: next.type, timestamp: base + offset });
+        offset += 100;
+      } else {
+        logs.push({ nodeId: nextId, text: `Reenviando a ${next.name} (${fromName} → ${toName})`, type: next.type, timestamp: base + offset });
+        offset += 100;
+      }
+    }
+
+    return logs;
   }
 
   start() {

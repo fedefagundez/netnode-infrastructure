@@ -10,7 +10,9 @@ class CanvasInteraction {
   }
 
   _setup() {
-    this.canvas.canvas.addEventListener('wheel', (e) => {
+    const el = this.canvas.canvas;
+
+    el.addEventListener('wheel', (e) => {
       e.preventDefault();
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
@@ -20,14 +22,14 @@ class CanvasInteraction {
       this.onDraw();
     }, { passive: false });
 
-    this.canvas.canvas.addEventListener('mousedown', (e) => {
+    el.addEventListener('mousedown', (e) => {
       this._dragging = true;
       this._lastX = e.clientX;
       this._lastY = e.clientY;
       this.canvas.cursor = 'grabbing';
     });
 
-    window.addEventListener('mousemove', (e) => {
+    el.addEventListener('mousemove', (e) => {
       if (!this._dragging) return;
       this.camera.offsetX += e.clientX - this._lastX;
       this.camera.offsetY += e.clientY - this._lastY;
@@ -36,7 +38,12 @@ class CanvasInteraction {
       this.onDraw();
     });
 
-    window.addEventListener('mouseup', () => {
+    el.addEventListener('mouseup', () => {
+      this._dragging = false;
+      this.canvas.cursor = 'grab';
+    });
+
+    el.addEventListener('mouseleave', () => {
       this._dragging = false;
       this.canvas.cursor = 'grab';
     });
