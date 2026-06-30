@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetNode Infrastructure</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Pantalla de inicio: solo docente ingresa -->
+  <div id="role-screen" class="screen hidden">
+    <div class="login-box">
+      <h1>NetNode Infrastructure</h1>
+      <p>Simulador de red con componentes de infraestructura</p>
+      <input type="text" id="teacher-name-input" placeholder="Tu nombre" maxlength="20">
+      <input type="text" id="group-name-input" placeholder="Nombre del grupo" maxlength="30">
+      <button id="btn-create-room" class="primary-btn">Crear sala</button>
+    </div>
+  </div>
+
+  <!-- Dashboard del profesor -->
+  <div id="teacher-dashboard-screen" class="screen hidden">
+    <div class="teacher-dashboard">
+      <div class="teacher-topbar">
+        <div class="teacher-topbar-left">
+          <span class="app-title">NetNode Infrastructure</span>
+          <span class="teacher-group" id="teacher-group-name"></span>
+        </div>
+        <span class="node-count" id="teacher-node-count">0 nodos conectados</span>
+        <div class="teacher-topbar-right">
+          <div class="share-info-box">
+            <div class="share-row">
+              <span class="share-label">Enlace:</span>
+              <input type="text" id="teacher-share-link" class="share-link-input" readonly>
+              <button id="btn-copy-link" class="btn-copy">Copiar</button>
+            </div>
+            <div class="share-row">
+              <span class="share-label">Código:</span>
+              <span class="share-code" id="teacher-room-code">----</span>
+              <button id="btn-copy-code" class="btn-copy">Copiar</button>
+            </div>
+          </div>
+          <label class="theme-toggle" title="Cambiar tema">
+            <input type="checkbox" id="theme-toggle-teacher">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="teacher-main">
+        <div class="topology-panel">
+          <div class="panel-header">Topología de la red</div>
+          <div class="canvas-outer" id="teacher-canvas-outer">
+            <canvas id="teacher-canvas"></canvas>
+          </div>
+        </div>
+        <div class="monitor-panel">
+          <div class="monitor-view" id="monitor-list-view">
+            <div class="panel-header">Monitoreo de chats</div>
+            <div class="search-box">
+              <input type="text" id="chat-search-input" placeholder="🔍 Buscar por nombre..." class="chat-search">
+            </div>
+            <div id="chat-pairs" class="chat-pairs-list"></div>
+          </div>
+
+          <div class="monitor-view hidden" id="monitor-chat-view">
+            <div class="chat-header">
+              <button id="btn-monitor-back" class="btn-back"><span class="arrow-left"></span></button>
+              <span id="monitor-chat-title">Chat</span>
+            </div>
+            <div id="teacher-chat-log" class="chat-log"></div>
+          </div>
+        </div>
+      </div>
+      <div class="statusbar" id="teacher-status">0 nodos conectados</div>
+    </div>
+  </div>
+
+  <!-- Pantalla del alumno: unirse a sala -->
+  <div id="student-join-screen" class="screen hidden">
+    <div class="login-box">
+      <h1>Unirse a Sala</h1>
+      <p>Ingresá el código que te dio el profesor</p>
+      <input type="text" id="room-code-input" placeholder="Código de sala (4 dígitos)" maxlength="4" pattern="[0-9]{4}" autofocus>
+      <input type="text" id="student-name-input" placeholder="Tu nombre" maxlength="20">
+      <button id="btn-join-room" class="primary-btn">Unirse</button>
+    </div>
+  </div>
+
+  <!-- Pantalla del alumno: red y chat -->
+  <div id="student-app-screen" class="screen hidden">
+    <div class="app">
+      <div class="topbar">
+        <span class="app-title">NetNode Infrastructure</span>
+        <span class="nbadge" id="badge">0 nodos</span>
+        <span class="node-info">Soy: <strong id="my-name"></strong> (<span id="my-label"></span>)</span>
+        <label class="theme-toggle" title="Cambiar tema">
+          <input type="checkbox" id="theme-toggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="mobile-tabs">
+        <button class="mobile-tab active" data-tab="chat">Chat</button>
+        <button class="mobile-tab" data-tab="network">Red</button>
+      </div>
+      <div class="main">
+        <div class="chat-panel">
+          <div class="chat-topbar">
+            <div class="chat-topbar-left">
+              <span id="my-status" class="my-status">Nodo activo</span>
+            </div>
+            <button id="btn-toggle-node" class="toggle-btn on">On</button>
+          </div>
+          <div class="contacts-view" id="contacts-view">
+            <div class="contacts-header">Mis contactos</div>
+            <div id="contacts-list" class="contacts-list"></div>
+          </div>
+          <div class="chat-view hidden" id="chat-view">
+            <div class="chat-header">
+              <button id="btn-back" class="btn-back"><span class="arrow-left"></span></button>
+              <span id="chat-with">Chat</span>
+            </div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="chat-input-area">
+              <input type="text" id="msg-input" placeholder="Escribí un mensaje..." disabled>
+              <button id="btn-send" disabled>Enviar</button>
+            </div>
+          </div>
+        </div>
+        <div class="network-panel">
+          <div class="canvas-outer" id="canvas-outer">
+            <canvas id="c"></canvas>
+          </div>
+          <div class="statusbar" id="status">Esperando conexión...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="client/theme.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="sounds.js"></script>
+  <script type="module" src="client/entry.js"></script>
+</body>
+</html>
