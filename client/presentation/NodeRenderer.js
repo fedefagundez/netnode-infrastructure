@@ -1,5 +1,28 @@
 import { isDark, getThemeColors } from '../domain/ThemeColors.js';
 
+function getLabelFontSize(radius) {
+  return Math.max(13, Math.round(radius * 0.6));
+}
+
+function getNameFontSize(radius) {
+  return Math.max(11, Math.round(radius * 0.35));
+}
+
+function drawLabelAndName(ctx, node, x, y, radius, labelColor, nameColor) {
+  const fs = getLabelFontSize(radius);
+  ctx.fillStyle = labelColor;
+  ctx.font = `bold ${fs}px -apple-system,sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(node.label, x, y);
+
+  const nameFs = getNameFontSize(radius);
+  ctx.font = `${nameFs}px -apple-system,sans-serif`;
+  ctx.fillStyle = nameColor;
+  ctx.textBaseline = 'top';
+  ctx.fillText(node.name, x, y + radius + nameFs + 4);
+}
+
 function drawNode(ctx, node, x, y, radius, colors, scale = 1) {
   const { nodeActive, nodeActiveBr, nodeOff, nodeOffBr, nodeMe, nodeMeBr, lblOn, lblOff } = colors;
   const isMe = colors.myNodeId !== undefined && node.id === colors.myNodeId;
@@ -41,17 +64,9 @@ function drawNode(ctx, node, x, y, radius, colors, scale = 1) {
     ctx.restore();
   }
 
-  const fs = Math.max(13, Math.round(radius * 0.6));
-  ctx.fillStyle = node.on ? lblOn : lblOff;
-  ctx.font = `bold ${fs}px -apple-system,sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(node.label, x, y);
-
-  const nameFs = Math.max(11, Math.round(radius * 0.35));
-  ctx.font = `${nameFs}px -apple-system,sans-serif`;
-  ctx.fillStyle = isMe ? nodeMeBr : (isDark() ? '#c4b5e0' : '#4a3570');
-  ctx.fillText(node.name, x, y + radius + nameFs + 4);
+  const labelColor = node.on ? lblOn : lblOff;
+  const nameColor = isMe ? nodeMeBr : (isDark() ? '#c4b5e0' : '#4a3570');
+  drawLabelAndName(ctx, node, x, y, radius, labelColor, nameColor);
 }
 
 function drawRouterNode(ctx, node, x, y, radius, colors, scale = 1) {
@@ -73,17 +88,7 @@ function drawRouterNode(ctx, node, x, y, radius, colors, scale = 1) {
 
   ctx.restore();
 
-  const fs = Math.max(13, Math.round(radius * 0.6));
-  ctx.fillStyle = theme.infraLabel;
-  ctx.font = `bold ${fs}px -apple-system,sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(node.label, x, y);
-
-  const nameFs = Math.max(11, Math.round(radius * 0.35));
-  ctx.font = `${nameFs}px -apple-system,sans-serif`;
-  ctx.fillStyle = isDark() ? theme.textSecondary : '#7d4e1e';
-  ctx.fillText(node.name, x, y + radius + nameFs + 4);
+  drawLabelAndName(ctx, node, x, y, radius, theme.infraLabel, isDark() ? theme.textSecondary : '#7d4e1e');
 }
 
 function drawDNSNode(ctx, node, x, y, radius, colors, scale = 1) {
@@ -98,17 +103,7 @@ function drawDNSNode(ctx, node, x, y, radius, colors, scale = 1) {
   ctx.lineWidth = 2 / scale;
   ctx.stroke();
 
-  const fs = Math.max(13, Math.round(radius * 0.6));
-  ctx.fillStyle = theme.infraLabel;
-  ctx.font = `bold ${fs}px -apple-system,sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(node.label, x, y);
-
-  const nameFs = Math.max(11, Math.round(radius * 0.35));
-  ctx.font = `${nameFs}px -apple-system,sans-serif`;
-  ctx.fillStyle = isDark() ? theme.textDns : '#5b2c6f';
-  ctx.fillText(node.name, x, y + radius + nameFs + 4);
+  drawLabelAndName(ctx, node, x, y, radius, theme.infraLabel, isDark() ? theme.textDns : '#5b2c6f');
 }
 
 function drawFirewallNode(ctx, node, x, y, radius, colors, scale = 1) {
@@ -130,17 +125,7 @@ function drawFirewallNode(ctx, node, x, y, radius, colors, scale = 1) {
   ctx.lineWidth = 2 / scale;
   ctx.stroke();
 
-  const fs = Math.max(13, Math.round(radius * 0.6));
-  ctx.fillStyle = theme.infraLabel;
-  ctx.font = `bold ${fs}px -apple-system,sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(node.label, x, y);
-
-  const nameFs = Math.max(11, Math.round(radius * 0.35));
-  ctx.font = `${nameFs}px -apple-system,sans-serif`;
-  ctx.fillStyle = isDark() ? theme.textFirewall : '#922b21';
-  ctx.fillText(node.name, x, y + radius + nameFs + 4);
+  drawLabelAndName(ctx, node, x, y, radius, theme.infraLabel, isDark() ? theme.textFirewall : '#922b21');
 }
 
 function drawNodeByType(ctx, node, x, y, radius, colors, scale = 1) {
@@ -159,40 +144,46 @@ function drawNodeByType(ctx, node, x, y, radius, colors, scale = 1) {
   }
 }
 
-function drawPacket(ctx, x, y, radius, scale = 1, theme = null) {
+function drawPacketWithGlow(ctx, x, y, radius, scale, theme, options) {
   const t = theme || getThemeColors();
-  const pr = Math.max(7, Math.round(radius * 0.012 * 60));
+  const pr = Math.max(options.baseRadius, Math.round(radius * options.radiusRatio * 60));
   ctx.beginPath();
   ctx.arc(x, y, pr, 0, Math.PI * 2);
-  ctx.fillStyle = t.packet;
+  ctx.fillStyle = options.fillColor;
   ctx.fill();
-  ctx.strokeStyle = t.packetBorder;
-  ctx.lineWidth = 2 / scale;
+  ctx.strokeStyle = options.borderColor;
+  ctx.lineWidth = options.lineWidth / scale;
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.arc(x, y, pr + 5, 0, Math.PI * 2);
-  ctx.strokeStyle = t.packetGlow;
+  ctx.arc(x, y, pr + options.glowOffset, 0, Math.PI * 2);
+  ctx.strokeStyle = options.glowColor;
   ctx.lineWidth = 1 / scale;
   ctx.stroke();
 }
 
-function drawDnsPacket(ctx, x, y, radius, scale = 1, theme = null) {
-  const t = theme || getThemeColors();
-  const pr = Math.max(4, Math.round(radius * 0.008 * 60));
-  ctx.beginPath();
-  ctx.arc(x, y, pr, 0, Math.PI * 2);
-  ctx.fillStyle = t.dnsPacket;
-  ctx.fill();
-  ctx.strokeStyle = t.dnsPacketBorder;
-  ctx.lineWidth = 1.5 / scale;
-  ctx.stroke();
+function drawPacket(ctx, x, y, radius, scale = 1, theme = null) {
+  drawPacketWithGlow(ctx, x, y, radius, scale, theme, {
+    baseRadius: 7,
+    radiusRatio: 0.012,
+    fillColor: theme?.packet || '#3b82f6',
+    borderColor: theme?.packetBorder || '#1d4ed8',
+    lineWidth: 2,
+    glowOffset: 5,
+    glowColor: theme?.packetGlow || 'rgba(59, 130, 246, 0.5)',
+  });
+}
 
-  ctx.beginPath();
-  ctx.arc(x, y, pr + 3, 0, Math.PI * 2);
-  ctx.strokeStyle = t.dnsPacketGlow;
-  ctx.lineWidth = 1 / scale;
-  ctx.stroke();
+function drawDnsPacket(ctx, x, y, radius, scale = 1, theme = null) {
+  drawPacketWithGlow(ctx, x, y, radius, scale, theme, {
+    baseRadius: 4,
+    radiusRatio: 0.008,
+    fillColor: theme?.dnsPacket || '#22c55e',
+    borderColor: theme?.dnsPacketBorder || '#16a34a',
+    lineWidth: 1.5,
+    glowOffset: 3,
+    glowColor: theme?.dnsPacketGlow || 'rgba(34, 197, 94, 0.5)',
+  });
 }
 
 const roundRectCanvas = (ctx, x, y, w, h, r) => {

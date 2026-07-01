@@ -1,4 +1,18 @@
 class NetworkClient {
+  static EVENT_CALLBACKS = {
+    'room-created': 'onRoomCreated',
+    'state-update': 'onStateUpdate',
+    'packet': 'onPacket',
+    'receive-message': 'onReceiveMessage',
+    'message-error': 'onMessageError',
+    'dns-response': 'onDnsResponse',
+    'dns-query': 'onDnsQuery',
+    'firewall-rules': 'onFirewallRules',
+    'firewall-decision': 'onFirewallDecision',
+    'error': 'onError',
+    'room-closed': 'onRoomClosed',
+  };
+
   constructor() {
     this.socket = null;
     this.myNodeId = null;
@@ -22,6 +36,11 @@ class NetworkClient {
     this.onFirewallDecision = null;
   }
 
+  _emitCallback(name, data) {
+    const callback = this[name];
+    if (callback) callback(data);
+  }
+
   connect() {
     this.socket = io('/', { transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 1000 });
 
@@ -35,62 +54,29 @@ class NetworkClient {
       this.connected = false;
     });
 
-    this.socket.on('room-created', (data) => {
-      if (this.onRoomCreated) this.onRoomCreated(data);
-    });
-
     this.socket.on('room-joined', (data) => {
       this.myNodeId = data.nodeId;
       this.myLabel = data.label;
       this.mySubnetId = data.subnetId;
       this.state = data.state;
       this.roomCode = data.state.code;
-      if (this.onRoomJoined) this.onRoomJoined(data);
+      this._emitCallback('onRoomJoined', data);
     });
 
     this.socket.on('state-update', (newState) => {
       this.state = newState;
-      if (this.onStateUpdate) this.onStateUpdate(newState);
+      this._emitCallback('onStateUpdate', newState);
     });
 
-    this.socket.on('packet', (data) => {
-      if (this.onPacket) this.onPacket(data);
-    });
-
-    this.socket.on('receive-message', (data) => {
-      if (this.onReceiveMessage) this.onReceiveMessage(data);
-    });
-
-    this.socket.on('message-error', (data) => {
-      if (this.onMessageError) this.onMessageError(data);
-    });
-
-    this.socket.on('dns-response', (data) => {
-      console.log('[NetworkClient] dns-response recibido:', data);
-      if (this.onDnsResponse) this.onDnsResponse(data);
-    });
-
-    this.socket.on('dns-query', (data) => {
-      console.log('[NetworkClient] dns-query recibido:', data);
-      if (this.onDnsQuery) this.onDnsQuery(data);
-    });
-
-    this.socket.on('firewall-rules', (data) => {
-      if (this.onFirewallRules) this.onFirewallRules(data);
-    });
-
-    this.socket.on('firewall-decision', (data) => {
-      console.log('[NetworkClient] firewall-decision:', data);
-      if (this.onFirewallDecision) this.onFirewallDecision(data);
-    });
-
-    this.socket.on('error', (data) => {
-      if (this.onError) this.onError(data);
-    });
-
-    this.socket.on('room-closed', (data) => {
-      if (this.onRoomClosed) this.onRoomClosed(data);
-    });
+    for (const [event, callbackName] of Object.entries(NetworkClient.EVENT_CALLBACKS)) {
+      if (event === 'room-joined' || event === 'state-update') continue;
+      this.socket.on(event, (data) => {
+        if (event === 'dns-response' || event === 'dns-query' || event === 'firewall-decision') {
+          console.log(`[NetworkClient] ${event} recibido:`, data);
+        }
+        this._emitCallback(callbackName, data);
+      });
+    }
 
     this.socket.on('disconnect', () => {
       console.log('[Client] Desconectado del servidor');
