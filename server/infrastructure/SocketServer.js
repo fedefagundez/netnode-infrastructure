@@ -107,11 +107,32 @@ class SocketServer {
 
       socket.on('dns-query', (data) => {
         const room = this.roomManager.getRoomByStudentSocket(socket.id);
-        if (!room) return;
+        if (!room) {
+          console.log('[Server] dns-query pero no hay room');
+          return;
+        }
 
+        const sender = room.getNodeBySocket(socket.id);
         const { name } = data;
         const result = room.dnsResolve(name);
 
+        const dnsNodeId = room.getDnsNodeId();
+        const dnsPath = room.bfs(sender.id, dnsNodeId);
+        const returnPath = [...dnsPath].reverse();
+        const fullPath = [...dnsPath, ...returnPath.slice(1)];
+
+        let nodeLogs = [];
+        try { nodeLogs = this._generateDnsLogs(room, fullPath, sender.name, name); } catch (e) { console.error('[Server] dnsLogs error:', e); }
+
+        console.log('[Server] Enviando dns-query broadcast, from:', sender.id, 'fullPath:', fullPath);
+        this.io.to(room.code).emit('dns-query', {
+          from: sender.id,
+          path: fullPath,
+          query: name,
+          nodeLogs,
+        });
+
+        console.log('[Server] Enviando dns-response al socket:', socket.id);
         socket.emit('dns-response', {
           query: name,
           found: result.found,
@@ -147,6 +168,15 @@ class SocketServer {
             reason: firewallCheck.reason,
             receiverName: receiver.name,
             firewallName: firewallCheck.firewallName,
+            firewallId: firewallCheck.firewallId,
+          });
+          this.io.to(room.code).emit('firewall-decision', {
+            firewallId: firewallCheck.firewallId,
+            decision: 'reject',
+            fromId: sender.id,
+            fromName: sender.name,
+            toId: receiver.id,
+            toName: receiver.name,
           });
           console.log(`[Server] Firewall bloqueo mensaje en sala ${room.code}: ${sender.name} -> ${receiver.name} (${firewallCheck.firewallName})`);
           return;
@@ -289,13 +319,8 @@ class SocketServer {
     const base = Date.now();
     let offset = 0;
 
-    const routerCentral = path
-      .map(id => room.getNode(id))
-      .find(n => n && n.type === 'router' && n.subnetId === null);
-    const dns = path
-      .map(id => room.getNode(id))
-      .find(n => n && n.type === 'dns');
-    const destNode = room.getNode(path[path.length - 1]);
+    const dns = path.find(id => room.getNode(id)?.type === 'dns');
+    const dnsNode = dns ? room.getNode(dns) : null;
 
     for (let i = 0; i < path.length - 1; i++) {
       const currId = path[i];
@@ -304,33 +329,71 @@ class SocketServer {
       const next = room.getNode(nextId);
       if (!curr || !next) continue;
 
-      if (curr.type !== 'client' && curr.type !== 'router') {
-        logs.push({ nodeId: currId, text: `Reenviando a ${next.name} (${fromName} → ${toName})`, type: curr.type, timestamp: base + offset });
+      if (next.type === 'client') continue;
+
+      if (curr.type === 'firewall') {
+        logs.push({ nodeId: currId, text: `${curr.name}: Permitida ${fromName} → ${toName}`, type: 'firewall', timestamp: base + offset });
+        offset += 100;
+      } else if (next.type === 'firewall') {
+        logs.push({ nodeId: currId, text: `${curr.name} → ${next.name}: ${fromName} → ${toName}`, type: curr.type, timestamp: base + offset });
+        offset += 100;
+      } else if (curr.type === 'dns') {
+        logs.push({ nodeId: currId, text: `DNS: "${toName}" = ${next.name}`, type: 'dns', timestamp: base + offset });
+        offset += 100;
+      } else if (next.type === 'dns') {
+        logs.push({ nodeId: currId, text: `${curr.name} → ${next.name}: consulta "${toName}"`, type: curr.type, timestamp: base + offset });
+        offset += 100;
+      } else if (curr.type !== 'client') {
+        const isResponse = dnsNode && (i > path.indexOf(dns));
+        if (isResponse) {
+          logs.push({ nodeId: currId, text: `${curr.name} → ${next.name}: respuesta "${toName}"`, type: curr.type, timestamp: base + offset });
+        } else {
+          logs.push({ nodeId: currId, text: `${curr.name} → ${next.name}: ${fromName} → ${toName}`, type: curr.type, timestamp: base + offset });
+        }
         offset += 100;
       }
+    }
+
+    return logs;
+  }
+
+  _generateDnsLogs(room, path, fromName, query) {
+    const logs = [];
+    const base = Date.now();
+    let offset = 0;
+
+    const dns = path.find(id => room.getNode(id)?.type === 'dns');
+    const dnsNode = dns ? room.getNode(dns) : null;
+    const senderNode = room.getNode(path[0]);
+
+    for (let i = 0; i < path.length - 1; i++) {
+      const currId = path[i];
+      const nextId = path[i + 1];
+      const curr = room.getNode(currId);
+      const next = room.getNode(nextId);
+      if (!curr || !next) continue;
 
       if (next.type === 'client') continue;
 
-      if (next.type === 'firewall') {
-        logs.push({ nodeId: nextId, text: `Paquete permitido: ${fromName} → ${toName}`, type: next.type, timestamp: base + offset });
+      if (curr.type === 'dns') {
+        logs.push({ nodeId: currId, text: `DNS: "${query}" = ${next.name}`, type: 'dns', timestamp: base + offset });
         offset += 100;
-      } else if (routerCentral && next.id === routerCentral.id) {
-        logs.push({ nodeId: nextId, text: `Paquete recibido de ${fromName} con destino a ${toName}`, type: next.type, timestamp: base + offset });
+      } else if (next.type === 'dns') {
+        logs.push({ nodeId: currId, text: `${curr.name} → ${next.name}: consulta "${query}"`, type: curr.type, timestamp: base + offset });
         offset += 100;
-        logs.push({ nodeId: nextId, text: `Consulta DNS enviada para resolver ${toName}`, type: next.type, timestamp: base + offset });
+      } else if (curr.type === 'firewall') {
+        logs.push({ nodeId: currId, text: `${curr.name}: Permitida ${senderNode?.name || '?'} → ${next.name}`, type: 'firewall', timestamp: base + offset });
         offset += 100;
-
-        if (dns && destNode) {
-          logs.push({ nodeId: dns.id, text: `${toName} = ${destNode.label} (${destNode.name})`, type: dns.type, timestamp: base + offset });
-          offset += 100;
-        }
-
-        logs.push({ nodeId: nextId, text: 'Respuesta DNS recibida', type: next.type, timestamp: base + offset });
-        offset += 100;
-        logs.push({ nodeId: nextId, text: `Reenviando paquete a ${toName}`, type: next.type, timestamp: base + offset });
+      } else if (next.type === 'firewall') {
+        logs.push({ nodeId: currId, text: `${curr.name} → ${next.name}: consulta "${query}"`, type: curr.type, timestamp: base + offset });
         offset += 100;
       } else {
-        logs.push({ nodeId: nextId, text: `Reenviando a ${next.name} (${fromName} → ${toName})`, type: next.type, timestamp: base + offset });
+        const isResponse = dnsNode && (i > path.indexOf(dns));
+        if (isResponse) {
+          logs.push({ nodeId: currId, text: `${curr.name} → ${next.name}: respuesta "${query}"`, type: curr.type, timestamp: base + offset });
+        } else {
+          logs.push({ nodeId: currId, text: `${curr.name} → ${next.name}: consulta "${query}"`, type: curr.type, timestamp: base + offset });
+        }
         offset += 100;
       }
     }

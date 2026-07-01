@@ -1,10 +1,11 @@
 class ChatPanel {
-  constructor(receiveMessage, sentMessage, sendMessage, toggleNode, networkClient) {
+  constructor(receiveMessage, sentMessage, sendMessage, toggleNode, networkClient, renderer) {
     this.receiveMessage = receiveMessage;
     this.sentMessage = sentMessage;
     this.sendMessage = sendMessage;
     this.toggleNode = toggleNode;
     this.networkClient = networkClient;
+    this.renderer = renderer;
     this.selectedContact = null;
     this.myNodeOn = true;
     this.pendingByContact = {};
@@ -168,6 +169,7 @@ class ChatPanel {
   }
 
   onDnsResponse(data) {
+    console.log('[ChatPanel] onDnsResponse:', data);
     const dnsNotification = document.createElement('div');
     dnsNotification.className = 'dns-notification';
     if (data.found) {
@@ -183,12 +185,6 @@ class ChatPanel {
       dnsNotification.classList.add('fade-out');
       setTimeout(() => dnsNotification.remove(), 500);
     }, 2000);
-
-    if (this.pendingDnsQuery && data.found) {
-      const { nodeId, text } = this.pendingDnsQuery;
-      this.pendingDnsQuery = null;
-      this._doSendMessage(nodeId, text);
-    }
   }
 
   onMessageError(data) {
@@ -238,13 +234,16 @@ class ChatPanel {
 
     if (this.networkClient) {
       this.pendingDnsQuery = { nodeId: this.selectedContact.id, text: text };
+      console.log('[ChatPanel] handleSend: pendingDnsQuery set, sending dnsQuery for:', this.selectedContact.name);
       this.networkClient.dnsQuery(this.selectedContact.name);
     } else {
+      console.log('[ChatPanel] No hay networkClient, enviando directo');
       this._doSendMessage(this.selectedContact.id, text);
     }
   }
 
   _doSendMessage(toNodeId, text) {
+    console.log('[ChatPanel] _doSendMessage called');
     const result = this.sendMessage.execute(toNodeId, text);
     if (result.success) {
       this.sentMessage.addMessage({
@@ -255,6 +254,15 @@ class ChatPanel {
       });
       this.appendMessage('Yo', text, 'out');
       this.msgInput.value = '';
+    }
+  }
+
+  sendPendingDnsMessage() {
+    console.log('[ChatPanel] sendPendingDnsMessage called, pending:', this.pendingDnsQuery);
+    if (this.pendingDnsQuery) {
+      const { nodeId, text } = this.pendingDnsQuery;
+      this.pendingDnsQuery = null;
+      this._doSendMessage(nodeId, text);
     }
   }
 

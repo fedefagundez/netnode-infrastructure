@@ -1,21 +1,61 @@
 import { ANIMATION } from '../domain/constants.js';
 
 class PacketAnimator {
-  constructor({ getPosition, getNode, onDraw, onComplete }) {
+  constructor({ getPosition, getNode, onDraw, onNodeVisited, onComplete }) {
     this.getPosition = getPosition;
     this.getNode = getNode || (() => null);
     this.onDraw = onDraw;
+    this.onNodeVisited = onNodeVisited || (() => {});
     this.onComplete = onComplete || (() => {});
     this.packets = [];
     this.dnsQueries = [];
     this.animId = null;
     this.routerCentralId = null;
     this.dnsId = null;
+    this.onDnsQueryComplete = null;
+    this.onClientDnsComplete = null;
   }
 
   setSpecialNodes(routerCentralId, dnsId) {
     this.routerCentralId = routerCentralId;
     this.dnsId = dnsId;
+  }
+
+  setOnDnsQueryComplete(callback) {
+    this.onDnsQueryComplete = callback;
+  }
+
+  animateDnsQuery(path, callback) {
+    console.log('[PacketAnimator] animateDnsQuery called, path:', path);
+    if (!path || path.length < 2) {
+      console.log('[PacketAnimator] invalid path');
+      if (callback) callback();
+      return;
+    }
+
+    const firstPos = this.getPosition(path[0]);
+    if (!firstPos) {
+      console.log('[PacketAnimator] first position not found');
+      if (callback) callback();
+      return;
+    }
+
+    this.dnsQueries.push({
+      path: path,
+      edgeIdx: 0,
+      t: 0,
+      pos: { ...firstPos },
+      alive: true,
+      isClientDns: true,
+      onComplete: callback,
+      color: '#e74c3c',
+    });
+    console.log('[PacketAnimator] dnsQueries:', this.dnsQueries.length);
+
+    if (!this.animId) {
+      console.log('[PacketAnimator] starting animation loop');
+      this.step();
+    }
   }
 
   animate(path) {
@@ -45,13 +85,10 @@ class PacketAnimator {
         pkt.edgeIdx++;
 
         const arrivedAt = pkt.path[pkt.edgeIdx];
-        if (arrivedAt === this.routerCentralId && this.dnsId != null && pkt.dnsPending === undefined) {
-          pkt.paused = true;
-          pkt.dnsPending = true;
-          const pos = this.getPosition(arrivedAt);
-          pkt.pos = pos ? { x: pos.x, y: pos.y } : null;
-          this.triggerDnsQuery(pkt);
-          continue;
+        const arrivedNode = this.getNode(arrivedAt);
+        if (arrivedNode) {
+          const animType = arrivedNode.type === 'firewall' ? 'accept' : arrivedNode.type;
+          this.onNodeVisited(arrivedAt, animType);
         }
       }
 
@@ -81,37 +118,10 @@ class PacketAnimator {
     }
   }
 
-  triggerDnsQuery(originalPacket) {
-    if (this.routerCentralId == null || this.dnsId == null) {
-      originalPacket.paused = false;
-      originalPacket.dnsPending = false;
-      return;
-    }
-
-    const routerPos = this.getPosition(this.routerCentralId);
-    const dnsPos = this.getPosition(this.dnsId);
-    if (!routerPos || !dnsPos) {
-      originalPacket.paused = false;
-      originalPacket.dnsPending = false;
-      return;
-    }
-
-    this.dnsQueries.push({
-      path: [this.routerCentralId, this.dnsId, this.routerCentralId],
-      edgeIdx: 0,
-      t: 0,
-      pos: { ...routerPos },
-      alive: true,
-      originalPacket,
-      color: '#e74c3c',
-    });
-
-    if (!this.animId) {
-      this.step();
-    }
-  }
-
   stepDns() {
+    if (this.dnsQueries.length > 0) {
+      console.log('[PacketAnimator] stepDns running, queries:', this.dnsQueries.length);
+    }
     for (const q of this.dnsQueries) {
       if (!q.alive) continue;
 
@@ -119,6 +129,12 @@ class PacketAnimator {
       if (q.t >= 1) {
         q.t = 0;
         q.edgeIdx++;
+        console.log('[PacketAnimator] DNS query edgeIdx:', q.edgeIdx, 'path length:', q.path.length);
+        const arrivedAt = q.path[q.edgeIdx];
+        const arrivedNode = this.getNode(arrivedAt);
+        if (arrivedNode) {
+          this.onNodeVisited(arrivedAt, arrivedNode.type);
+        }
       }
 
       if (q.edgeIdx >= q.path.length - 1) {
@@ -126,17 +142,21 @@ class PacketAnimator {
         const last = this.getPosition(q.path[q.path.length - 1]);
         q.pos = last ? { ...last } : null;
 
-        const op = q.originalPacket;
-        op.paused = false;
-        op.dnsPending = false;
-        op.t = 0;
-
-        this.onDraw();
-
-        setTimeout(() => {
-          q.pos = null;
+        if (q.isClientDns) {
+          setTimeout(() => {
+            q.pos = null;
+            this.onDraw();
+            console.log('[PacketAnimator] DNS animation complete, calling callbacks');
+            if (q.onComplete) q.onComplete();
+            if (this.onClientDnsComplete) this.onClientDnsComplete();
+          }, ANIMATION.DNS_FADE_DELAY);
+        } else {
           this.onDraw();
-        }, ANIMATION.DNS_FADE_DELAY);
+          setTimeout(() => {
+            q.pos = null;
+            this.onDraw();
+          }, ANIMATION.DNS_FADE_DELAY);
+        }
         continue;
       }
 

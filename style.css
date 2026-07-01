@@ -334,12 +334,14 @@ body {
 .message.out {
   align-self: flex-end;
   background: var(--chat-bubble-out);
+  color: #ffffff;
   border-bottom-right-radius: 2px;
 }
 
 .message.in {
   align-self: flex-start;
   background: var(--chat-bubble-in);
+  color: var(--text-primary);
   border-bottom-left-radius: 2px;
   border: 1px solid var(--border-light);
 }

@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Íconos animados de red (Canvas)</title>
+<style>
+  :root{
+    --bg: #eef3fb;
+    --panel: #ffffff;
+    --ink: #1f2a44;
+    --sub: #5b6b8c;
+    --blue: #3b82f6;
+    --blue-deep: #2563eb;
+    --green: #22c55e;
+    --green-deep: #16a34a;
+    --red: #ef4444;
+    --red-deep: #dc2626;
+    --yellow: #fbbf24;
+    --line: #dbe4f5;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(circle at 20% 10%, #f5f9ff 0%, var(--bg) 60%);
+    color: var(--ink);
+    padding: 32px 20px 60px;
+  }
+  h1{
+    text-align: center;
+    font-size: clamp(22px, 4vw, 32px);
+    margin: 0 0 4px;
+  }
+  p.lead{
+    text-align: center;
+    color: var(--sub);
+    margin: 0 0 36px;
+    font-size: 15px;
+  }
+  .grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  .card{
+    background: var(--panel);
+    border-radius: 20px;
+    padding: 20px 18px 22px;
+    border: 1px solid var(--line);
+    box-shadow: 0 10px 24px -16px rgba(31,42,68,.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .card h2{
+    font-size: 17px;
+    margin: 14px 0 4px;
+  }
+  .card p{
+    font-size: 13px;
+    color: var(--sub);
+    margin: 0 0 14px;
+    min-height: 32px;
+  }
+  .icon-wrap{
+    width: 100%;
+    max-width: 150px;
+    aspect-ratio: 1;
+  }
+  .icon-wrap canvas{ width: 100%; height: 100%; display: block; }
+  .btns{ display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button{
+    border: none;
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    transition: transform .12s ease, filter .12s ease;
+    font-family: inherit;
+  }
+  button:hover  { filter: brightness(1.08); }
+  button:active { transform: scale(.95); }
+  .btn-blue  { background: var(--blue); }
+  .btn-green { background: var(--green); }
+  .btn-red   { background: var(--red); }
+
+  footer{
+    text-align: center;
+    color: var(--sub);
+    font-size: 12px;
+    margin-top: 40px;
+  }
+  code{
+    background: #f1f5fb;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 11.5px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🌐 Íconos de red animados (Canvas)</h1>
+<p class="lead">Tocá los botones para ver cómo "viaja" un mensaje por cada parte de la red</p>
+
+<div class="grid">
+
+  <!-- ══ NODO PC ══ -->
+  <div class="card">
+    <div class="icon-wrap">
+      <canvas id="nodoIcon"></canvas>
+    </div>
+    <h2>Nodo / PC</h2>
+    <p>Parpadea al enviar o recibir un mensaje</p>
+    <div class="btns">
+      <button class="btn-blue" onclick="triggerNodo()">Enviar mensaje</button>
+    </div>
+  </div>
+
+  <!-- ══ ROUTER ══ -->
+  <div class="card">
+    <div class="icon-wrap">
+      <canvas id="routerIcon"></canvas>
+    </div>
+    <h2>Router</h2>
+    <p>Las luces se encienden en cadena al procesar un paquete</p>
+    <div class="btns">
+      <button class="btn-blue" onclick="triggerRouter()">Procesar paquete</button>
+    </div>
+  </div>
+
+  <!-- ══ DNS ══ -->
+  <div class="card">
+    <div class="icon-wrap">
+      <canvas id="dnsIcon"></canvas>
+    </div>
+    <h2>DNS</h2>
+    <p>La lupa "busca" la dirección al resolver un dominio</p>
+    <div class="btns">
+      <button class="btn-blue" onclick="triggerDNS()">Resolver dominio</button>
+    </div>
+  </div>
+
+  <!-- ══ FIREWALL ══ -->
+  <div class="card">
+    <div class="icon-wrap">
+      <canvas id="firewallIcon"></canvas>
+    </div>
+    <h2>Firewall</h2>
+    <p>Deja pasar o bloquea cada paquete según las reglas</p>
+    <div class="btns">
+      <button class="btn-green" onclick="triggerFirewall('accept')">✅ Aceptar</button>
+      <button class="btn-red"   onclick="triggerFirewall('reject')">⛔ Rechazar</button>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Animaciones dibujadas a mano cuadro por cuadro con <code>requestAnimationFrame</code> sobre <code>&lt;canvas&gt;</code> — mismo diseño, sin SVG ni CSS keyframes.
+</footer>
+
+<script>
+/* ============================================================
+   COLORES (mismos valores que las variables CSS del original)
+   ============================================================ */
+const COLOR = {
+  blue:      '#3b82f6',
+  blueDeep:  '#2563eb',
+  green:     '#22c55e',
+  greenDeep: '#16a34a',
+  red:       '#ef4444',
+  redDeep:   '#dc2626',
+  yellow:    '#fbbf24',
+};
+
+/* ============================================================
+   HELPERS DE DIBUJO
+   ============================================================ */
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+function strokeLine(ctx, x1, y1, x2, y2){
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+/* ============================================================
+   EASING (aproximaciones de las funciones CSS usadas)
+   ============================================================ */
+const ease = {
+  inOut: t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
+  in:    t => t * t,
+  out:   t => t * (2 - t),
+  linear:t => t,
+};
+function lerp(a, b, t){ return a + (b - a) * t; }
+
+/* Interpola un set de "keyframes" (objetos {p:0..1, ...props}) */
+function sampleFrames(progress, frames, easingFn){
+  if (progress <= frames[0].p) return frames[0];
+  const last = frames[frames.length - 1];
+  if (progress >= last.p) return last;
+  for (let i = 0; i < frames.length - 1; i++){
+    const a = frames[i], b = frames[i + 1];
+    if (progress >= a.p && progress <= b.p){
+      const local = (b.p - a.p) === 0 ? 0 : (progress - a.p) / (b.p - a.p);
+      const e = easingFn(local);
+      const out = {};
+      for (const k in a){ if (k !== 'p') out[k] = lerp(a[k], b[k], e); }
+      return out;
+    }
+  }
+  return last;
+}
+
+/* Animación con delay + duración, igual que "animation-delay" / "animation-duration" en CSS.
+   infinite=true -> se repite en bucle mientras el ícono esté activo.
+   infinite=false -> al terminar se queda en el último cuadro (equivalente a fill:forwards). */
+function animValue(elapsedMs, delayMs, durationMs, frames, easingFn, infinite){
+  if (elapsedMs < delayMs) return frames[0];
+  let local = elapsedMs - delayMs;
+  if (infinite){
+    local = local % durationMs;
+    return sampleFrames(local / durationMs, frames, easingFn);
+  }
+  if (local >= durationMs) return frames[frames.length - 1];
+  return sampleFrames(local / durationMs, frames, easingFn);
+}
+
+/* ============================================================
+   AJUSTE DE CANVAS (equivalente a viewBox + preserveAspectRatio
+   "xMidYMid meet" de SVG: escala uniforme y centrada)
+   ============================================================ */
+function makeIcon(canvasId, vbW, vbH, drawFn){
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const icon = { canvas, ctx, vbW, vbH, fit: null, draw: drawFn, start: null, duration: 0, mode: null };
+
+  function fit(){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    const scale = Math.min(w / vbW, h / vbH);
+    icon.fit = {
+      dpr,
+      scale,
+      offsetX: (w - vbW * scale) / 2,
+      offsetY: (h - vbH * scale) / 2,
+      cssW: w,
+      cssH: h,
+    };
+  }
+  fit();
+  new ResizeObserver(fit).observe(canvas);
+  window.addEventListener('resize', fit);
+
+  icon.render = function(now){
+    const f = icon.fit;
+    if (!f) return;
+    const { ctx } = icon;
+    ctx.save();
+    ctx.setTransform(f.dpr, 0, 0, f.dpr, 0, 0);
+    ctx.clearRect(0, 0, f.cssW, f.cssH);
+    ctx.setTransform(f.dpr * f.scale, 0, 0, f.dpr * f.scale, f.dpr * f.offsetX, f.dpr * f.offsetY);
+
+    let elapsed = null;
+    if (icon.start !== null){
+      elapsed = now - icon.start;
+      if (elapsed >= icon.duration){
+        icon.start = null;
+        icon.mode = null;
+        elapsed = null;
+      }
+    }
+    icon.draw(ctx, elapsed, icon.mode);
+    ctx.restore();
+  };
+
+  icon.trigger = function(duration, mode){
+    icon.start = performance.now();
+    icon.duration = duration;
+    icon.mode = mode || null;
+  };
+
+  return icon;
+}
+
+/* ============================================================
+   NODO / PC
+   ============================================================ */
+let nodoLabel = 'A';
+const haloFrames  = [{p:0, r:8,  opacity:.2}, {p:.5, r:14, opacity:0},  {p:1, r:8,  opacity:.2}];
+const puntoFrames = [{p:0, opacity:1},        {p:.5, opacity:.4},      {p:1, opacity:1}];
+
+function drawNodo(ctx, elapsed){
+  const active = elapsed !== null;
+
+  // cuerpo monitor
+  roundRect(ctx, 4, 4, 112, 76, 10);
+  ctx.fillStyle = '#cfe0ff'; ctx.fill();
+  ctx.lineWidth = 4; ctx.strokeStyle = COLOR.blueDeep; ctx.stroke();
+
+  // pantalla
+  roundRect(ctx, 14, 12, 92, 58, 6);
+  ctx.fillStyle = '#e8f0ff'; ctx.fill();
+
+  // letra
+  ctx.fillStyle = '#1d4ed8';
+  ctx.font = "700 40px 'Trebuchet MS', sans-serif";
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(nodoLabel, 59, 43);
+
+  // LED halo + punto
+  const halo  = active ? animValue(elapsed, 0, 1200, haloFrames, ease.inOut, true)  : { r: 8, opacity: 0 };
+  const punto = active ? animValue(elapsed, 0, 1200, puntoFrames, ease.inOut, true) : { opacity: .35 };
+
+  ctx.globalAlpha = halo.opacity;
+  ctx.beginPath(); ctx.arc(97, 19, halo.r, 0, Math.PI * 2);
+  ctx.fillStyle = COLOR.green; ctx.fill();
+
+  ctx.globalAlpha = punto.opacity;
+  ctx.beginPath(); ctx.arc(97, 19, 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = COLOR.green; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // soporte
+  roundRect(ctx, 50, 80, 20, 10, 2); ctx.fillStyle = COLOR.blueDeep; ctx.fill();
+  roundRect(ctx, 34, 90, 52, 7, 3);  ctx.fillStyle = '#9db8e8'; ctx.fill();
+}
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
+const ondaFrames = [{p:0, opacity:.9, scale:.4}, {p:1, opacity:0, scale:1.6}];
+const ledOnFrames = [{p:0, opacity:.2, glow:0}, {p:.35, opacity:1, glow:1}, {p:1, opacity:.2, glow:0}];
+const ROUTER_LEDS = [
+  { cx: 30, color: COLOR.green,  delay: 0   },
+  { cx: 44, color: COLOR.yellow, delay: 120 },
+  { cx: 58, color: COLOR.blue,   delay: 240 },
+  { cx: 72, color: COLOR.green,  delay: 360 },
+];
+
+function drawRouter(ctx, elapsed){
+  const active = elapsed !== null;
+
+  // onda wifi
+  const onda = active ? animValue(elapsed, 0, 900, ondaFrames, ease.out, false) : { opacity: 0, scale: 1 };
+  ctx.save();
+  ctx.translate(50, 18); ctx.scale(onda.scale, onda.scale); ctx.translate(-50, -18);
+  ctx.globalAlpha = onda.opacity;
+  ctx.beginPath(); ctx.arc(50, 18, 10, 0, Math.PI * 2);
+  ctx.lineWidth = 3; ctx.strokeStyle = COLOR.blue; ctx.stroke();
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  // antena
+  ctx.lineWidth = 3; ctx.strokeStyle = '#7a8aab'; ctx.lineCap = 'round';
+  strokeLine(ctx, 50, 28, 50, 34);
+  ctx.lineCap = 'butt';
+
+  // cuerpo
+  roundRect(ctx, 16, 34, 68, 38, 10);
+  ctx.fillStyle = '#d9e3f8'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = COLOR.blueDeep; ctx.stroke();
+
+  // patitas
+  roundRect(ctx, 26, 72, 6, 8, 2); ctx.fillStyle = '#9db8e8'; ctx.fill();
+  roundRect(ctx, 68, 72, 6, 8, 2); ctx.fillStyle = '#9db8e8'; ctx.fill();
+
+  // leds en cadena
+  ROUTER_LEDS.forEach(led => {
+    const st = active ? animValue(elapsed, led.delay, 900, ledOnFrames, ease.inOut, false) : { opacity: .2, glow: 0 };
+    ctx.save();
+    ctx.globalAlpha = st.opacity;
+    if (st.glow > 0.3){
+      ctx.shadowColor = COLOR.green;
+      ctx.shadowBlur = 6 * st.glow;
+    }
+    ctx.beginPath(); ctx.arc(led.cx, 53, 5, 0, Math.PI * 2);
+    ctx.fillStyle = led.color; ctx.fill();
+    ctx.restore();
+  });
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
+   DNS
+   ============================================================ */
+const brilloFrames = [{p:0, opacity:0}, {p:.5, opacity:.55}, {p:1, opacity:0}];
+const lupaFrames = [
+  {p:0,   tx:0,  ty:0,  rot:0},
+  {p:.25, tx:-7, ty:-4, rot:-8},
+  {p:.5,  tx:4,  ty:5,  rot:6},
+  {p:.75, tx:-3, ty:2,  rot:-3},
+  {p:1,   tx:0,  ty:0,  rot:0},
+];
+
+function drawDNS(ctx, elapsed){
+  const active = elapsed !== null;
+
+  // brillo de fondo
+  const brillo = active ? animValue(elapsed, 0, 1100, brilloFrames, ease.inOut, false) : { opacity: 0 };
+  roundRect(ctx, 20, 18, 56, 50, 10);
+  ctx.globalAlpha = brillo.opacity;
+  ctx.fillStyle = COLOR.yellow; ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // servidor / libro
+  roundRect(ctx, 24, 22, 48, 44, 8);
+  ctx.fillStyle = '#cfe0ff'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = COLOR.blueDeep; ctx.stroke();
+
+  ctx.lineWidth = 3; ctx.strokeStyle = COLOR.blueDeep; ctx.lineCap = 'round';
+  strokeLine(ctx, 32, 34, 64, 34);
+  strokeLine(ctx, 32, 44, 58, 44);
+  strokeLine(ctx, 32, 54, 50, 54);
+  ctx.lineCap = 'butt';
+
+  // lupa (rota y se desplaza al "buscar")
+  const lupa = active ? animValue(elapsed, 0, 1100, lupaFrames, ease.inOut, false) : { tx: 0, ty: 0, rot: 0 };
+  ctx.save();
+  ctx.translate(60, 60);
+  ctx.translate(lupa.tx, lupa.ty);
+  ctx.rotate(lupa.rot * Math.PI / 180);
+  ctx.translate(-60, -60);
+  ctx.globalAlpha = .85;
+  ctx.beginPath(); ctx.arc(64, 60, 11, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.lineWidth = 4; ctx.strokeStyle = COLOR.greenDeep; ctx.stroke();
+  ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.strokeStyle = COLOR.greenDeep;
+  strokeLine(ctx, 72, 68, 82, 78);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
+   FIREWALL
+   ============================================================ */
+function shieldPath(ctx){
+  ctx.beginPath();
+  ctx.moveTo(50, 14);
+  ctx.lineTo(80, 24);
+  ctx.lineTo(80, 52);
+  ctx.bezierCurveTo(80, 70, 67, 82, 50, 88);
+  ctx.bezierCurveTo(33, 82, 20, 70, 20, 52);
+  ctx.lineTo(20, 24);
+  ctx.closePath();
+}
+
+const glowFrames    = [{p:0, opacity:0}, {p:.5, opacity:.7}, {p:1, opacity:0}];
+const pasaFrames    = [{p:0, opacity:1, tx:-34}, {p:.55, opacity:1, tx:0}, {p:1, opacity:0, tx:34}];
+const checkFrames   = [{p:0, opacity:0, scale:.3}, {p:.6, opacity:1, scale:1.15}, {p:1, opacity:1, scale:1}];
+const rebotaFrames  = [
+  {p:0,   opacity:1, tx:-34, rot:0,   scale:1},
+  {p:.45, opacity:1, tx:-2,  rot:10,  scale:1},
+  {p:.7,  opacity:1, tx:-22, rot:-25, scale:.7},
+  {p:1,   opacity:0, tx:-40, rot:-60, scale:.2},
+];
+const shakeFrames = [{p:0,tx:0},{p:.2,tx:-3},{p:.4,tx:3},{p:.6,tx:-2},{p:.8,tx:2},{p:1,tx:0}];
+const xFrames     = [{p:0, opacity:0, scale:.3}, {p:.6, opacity:1, scale:1.2}, {p:1, opacity:1, scale:1}];
+
+function drawFirewall(ctx, elapsed, mode){
+  let glowGreen = 0, glowRed = 0, shakeX = 0;
+  let paqueteAccept = null, checkState = null, paqueteReject = null, xState = null;
+
+  if (mode === 'accept' && elapsed !== null){
+    paqueteAccept = animValue(elapsed, 0, 1000, pasaFrames, ease.in, false);
+    glowGreen = animValue(elapsed, 350, 600, glowFrames, ease.inOut, false).opacity;
+    checkState = animValue(elapsed, 450, 600, checkFrames, ease.out, false);
+  } else if (mode === 'reject' && elapsed !== null){
+    paqueteReject = animValue(elapsed, 0, 900, rebotaFrames, ease.out, false);
+    glowRed = animValue(elapsed, 300, 600, glowFrames, ease.inOut, false).opacity;
+    shakeX = animValue(elapsed, 300, 450, shakeFrames, ease.inOut, false).tx;
+    xState = animValue(elapsed, 400, 500, xFrames, ease.out, false);
+  }
+
+  // resplandor verde
+  ctx.save(); shieldPath(ctx); ctx.globalAlpha = glowGreen; ctx.fillStyle = COLOR.green; ctx.fill(); ctx.restore();
+  // resplandor rojo
+  ctx.save(); shieldPath(ctx); ctx.globalAlpha = glowRed; ctx.fillStyle = COLOR.red; ctx.fill(); ctx.restore();
+
+  // muro (con sacudida si rechaza)
+  ctx.save();
+  ctx.translate(shakeX, 0);
+  shieldPath(ctx);
+  ctx.fillStyle = '#dfe7f7'; ctx.fill();
+  ctx.lineWidth = 3.5; ctx.strokeStyle = COLOR.blueDeep; ctx.stroke();
+  ctx.lineWidth = 3; ctx.strokeStyle = '#9db8e8';
+  strokeLine(ctx, 32, 40, 68, 40);
+  strokeLine(ctx, 32, 52, 68, 52);
+  strokeLine(ctx, 32, 64, 60, 64);
+  ctx.restore();
+
+  // paquete que pasa (aceptar)
+  if (paqueteAccept){
+    ctx.save();
+    ctx.translate(paqueteAccept.tx, 0);
+    ctx.globalAlpha = paqueteAccept.opacity;
+    roundRect(ctx, 44, 46, 14, 14, 3);
+    ctx.fillStyle = COLOR.blue; ctx.fill();
+    ctx.restore();
+  }
+
+  // check
+  if (checkState){
+    ctx.save();
+    ctx.translate(51, 50); ctx.scale(checkState.scale, checkState.scale); ctx.translate(-51, -50);
+    ctx.globalAlpha = checkState.opacity;
+    ctx.beginPath();
+    ctx.moveTo(40, 51); ctx.lineTo(48, 59); ctx.lineTo(62, 41);
+    ctx.lineWidth = 5; ctx.strokeStyle = COLOR.greenDeep;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // paquete que rebota (rechazar)
+  if (paqueteReject){
+    ctx.save();
+    ctx.translate(51, 53);
+    ctx.translate(paqueteReject.tx, 0);
+    ctx.rotate(paqueteReject.rot * Math.PI / 180);
+    ctx.scale(paqueteReject.scale, paqueteReject.scale);
+    ctx.translate(-51, -53);
+    ctx.globalAlpha = paqueteReject.opacity;
+    roundRect(ctx, 44, 46, 14, 14, 3);
+    ctx.fillStyle = COLOR.red; ctx.fill();
+    ctx.restore();
+  }
+
+  // x
+  if (xState){
+    ctx.save();
+    ctx.translate(47, 52); ctx.scale(xState.scale, xState.scale); ctx.translate(-47, -52);
+    ctx.globalAlpha = xState.opacity;
+    ctx.lineWidth = 5; ctx.strokeStyle = COLOR.redDeep; ctx.lineCap = 'round';
+    strokeLine(ctx, 38, 45, 56, 59);
+    strokeLine(ctx, 56, 45, 38, 59);
+    ctx.restore();
+  }
+
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
+   INICIALIZACIÓN
+   ============================================================ */
+const nodoIcon     = makeIcon('nodoIcon',     120, 100, drawNodo);
+const routerIcon   = makeIcon('routerIcon',   100, 100, drawRouter);
+const dnsIcon      = makeIcon('dnsIcon',      100, 100, drawDNS);
+const firewallIcon = makeIcon('firewallIcon', 100, 100, drawFirewall);
+
+function triggerNodo()              { nodoIcon.trigger(1600); }
+function triggerRouter()            { routerIcon.trigger(1000); }
+function triggerDNS()               { dnsIcon.trigger(1300); }
+function triggerFirewall(mode)      { firewallIcon.trigger(mode === 'accept' ? 1100 : 1000, mode); }
+function setNodoLabel(letter)       { nodoLabel = letter; }
+
+function loop(now){
+  nodoIcon.render(now);
+  routerIcon.render(now);
+  dnsIcon.render(now);
+  firewallIcon.render(now);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ── API para tu simulación ──────────────────────────────────
+  // Asignar letra al nodo
+  setNodoLabel('B');
+
+  // Pulso al enviar/recibir paquete
+  triggerNodo();
+
+  // Router procesa paquete
+  triggerRouter();
+
+  // DNS resuelve
+  triggerDNS();
+
+  // Firewall
+  triggerFirewall('accept');
+  triggerFirewall('reject');
+──────────────────────────────────────────────────────────── */
+</script>
+
+</body>
+</html>

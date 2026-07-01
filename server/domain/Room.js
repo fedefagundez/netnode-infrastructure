@@ -177,6 +177,13 @@ class Room {
     return { found: false };
   }
 
+  getDnsNodeId() {
+    for (const [id, node] of this.nodes) {
+      if (node.type === 'dns') return id;
+    }
+    return null;
+  }
+
   checkFirewall(srcId, dstId) {
     const srcNode = this.nodes.get(srcId);
     const dstNode = this.nodes.get(dstId);
@@ -192,14 +199,14 @@ class Room {
     if (srcSubnet) {
       const srcRules = this.firewallRules[srcSubnet.firewallId] || {};
       if (srcRules.blockedNodes && srcRules.blockedNodes.includes(dstId)) {
-        return { allowed: false, reason: 'firewall-bloqueado', firewallName: this.nodes.get(srcSubnet.firewallId).name };
+        return { allowed: false, reason: 'firewall-bloqueado', firewallName: this.nodes.get(srcSubnet.firewallId).name, firewallId: srcSubnet.firewallId };
       }
     }
 
     if (dstSubnet) {
       const dstRules = this.firewallRules[dstSubnet.firewallId] || {};
       if (dstRules.blockedNodes && dstRules.blockedNodes.includes(srcId)) {
-        return { allowed: false, reason: 'firewall-bloqueado', firewallName: this.nodes.get(dstSubnet.firewallId).name };
+        return { allowed: false, reason: 'firewall-bloqueado', firewallName: this.nodes.get(dstSubnet.firewallId).name, firewallId: dstSubnet.firewallId };
       }
     }
 

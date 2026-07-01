@@ -1,8 +1,8 @@
-import { drawNodeByType, drawPacket, drawDnsPacket } from './NodeRenderer.js';
+import { drawNodeByType, drawNodeByTypeAnimated, drawPacket, drawDnsPacket } from './NodeRenderer.js';
 import { calculatePositions } from '../domain/layout.js';
 
 function drawTopology(ctx, cam, nodes, edges, options = {}) {
-  const { animator = null, theme = null, topology = 'school-network' } = options;
+  const { animator = null, theme = null, topology = 'school-network', animationManager = null } = options;
   const t = theme;
 
   ctx.clearRect(0, 0, cam.width, cam.height);
@@ -18,7 +18,7 @@ function drawTopology(ctx, cam, nodes, edges, options = {}) {
 
   drawGrid(ctx, cam, t);
   drawEdges(ctx, cam, edges, posMap, t);
-  drawNodes(ctx, cam, positions, t);
+  drawNodes(ctx, cam, positions, t, animationManager);
 
   if (animator) {
     drawPackets(ctx, cam, animator);
@@ -75,7 +75,7 @@ function drawEdges(ctx, cam, edges, posMap, t) {
   }
 }
 
-function drawNodes(ctx, cam, positions, t) {
+function drawNodes(ctx, cam, positions, t, animationManager = null) {
   const nr = Math.max(14, Math.round(cam.width * 0.025));
   const colors = {
     nodeActive: t.nodeActive,
@@ -89,7 +89,12 @@ function drawNodes(ctx, cam, positions, t) {
     theme: t,
   };
   for (const pos of positions) {
-    drawNodeByType(ctx, pos.node, pos.x, pos.y, nr, colors, cam.scale);
+    const animState = animationManager ? animationManager.getAnimation(pos.node.id) : null;
+    if (animState) {
+      drawNodeByTypeAnimated(ctx, pos.node, pos.x, pos.y, nr, colors, cam.scale, animState);
+    } else {
+      drawNodeByType(ctx, pos.node, pos.x, pos.y, nr, colors, cam.scale);
+    }
   }
 }
 
