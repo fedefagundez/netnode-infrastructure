@@ -17,7 +17,9 @@ class NetworkClient {
     this.onError = null;
     this.onRoomClosed = null;
     this.onDnsResponse = null;
+    this.onDnsQuery = null;
     this.onFirewallRules = null;
+    this.onFirewallDecision = null;
   }
 
   connect() {
@@ -64,11 +66,22 @@ class NetworkClient {
     });
 
     this.socket.on('dns-response', (data) => {
+      console.log('[NetworkClient] dns-response recibido:', data);
       if (this.onDnsResponse) this.onDnsResponse(data);
+    });
+
+    this.socket.on('dns-query', (data) => {
+      console.log('[NetworkClient] dns-query recibido:', data);
+      if (this.onDnsQuery) this.onDnsQuery(data);
     });
 
     this.socket.on('firewall-rules', (data) => {
       if (this.onFirewallRules) this.onFirewallRules(data);
+    });
+
+    this.socket.on('firewall-decision', (data) => {
+      console.log('[NetworkClient] firewall-decision:', data);
+      if (this.onFirewallDecision) this.onFirewallDecision(data);
     });
 
     this.socket.on('error', (data) => {

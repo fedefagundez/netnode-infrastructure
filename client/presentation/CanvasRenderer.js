@@ -4,6 +4,7 @@ import { NODE_TYPE_INFO } from '../domain/NodeTypes.js';
 import { drawTopology as drawTopologyShared } from './drawTopologyShared.js';
 import { NodeLogStore } from './NodeLogStore.js';
 import { NodeLogPopover } from './NodeLogPopover.js';
+import { NodeAnimationManager } from './NodeAnimationManager.js';
 
 class CanvasRenderer {
   constructor(canvasAdapter, camera, network) {
@@ -15,11 +16,15 @@ class CanvasRenderer {
     this.tooltip = null;
     this.nodeLog = new NodeLogStore();
     this.popover = new NodeLogPopover();
+    this.nodeAnimations = new NodeAnimationManager();
 
     this.animator = new PacketAnimator({
       getPosition: (id) => this.network.getNode(id),
       getNode: (id) => this.network.getNode(id),
       onDraw: () => this.draw(),
+      onNodeVisited: (nodeId, nodeType) => {
+        this.nodeAnimations.trigger(nodeId, nodeType);
+      },
       onComplete: () => { if (this.onAnimationComplete) this.onAnimationComplete(); },
     });
 
@@ -102,6 +107,7 @@ class CanvasRenderer {
     drawTopologyShared(ctx, cam, net.nodes, net.edges, {
       animator: this.animator,
       theme: c,
+      animationManager: this.nodeAnimations,
     });
   }
 

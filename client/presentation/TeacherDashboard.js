@@ -7,6 +7,7 @@ import { PacketAnimator } from './PacketAnimator.js';
 import { drawTopology as drawTopologyShared } from './drawTopologyShared.js';
 import { NodeLogStore } from './NodeLogStore.js';
 import { NodeLogPopover } from './NodeLogPopover.js';
+import { NodeAnimationManager } from './NodeAnimationManager.js';
 
 class TeacherDashboard {
   constructor(socket, canvasAdapter, networkClient) {
@@ -24,11 +25,15 @@ class TeacherDashboard {
     this.camera = new Camera(window.devicePixelRatio || 1);
     this.nodeLog = new NodeLogStore();
     this.popover = new NodeLogPopover();
+    this.nodeAnimations = new NodeAnimationManager();
 
     this.animator = new PacketAnimator({
       getPosition: (id) => this._getPosition(id),
       getNode: (id) => this.state.nodes.find(n => n.id === id) || null,
       onDraw: () => this.drawTopology(),
+      onNodeVisited: (nodeId, nodeType) => {
+        this.nodeAnimations.trigger(nodeId, nodeType);
+      },
     });
 
     window.addEventListener('themechange', () => this.drawTopology());
@@ -128,12 +133,35 @@ class TeacherDashboard {
       window.location.reload();
     });
 
+    this.socket.on('firewall-decision', (data) => {
+      console.log('[Teacher] firewall-decision:', data);
+      if (data.decision === 'reject') {
+        this.nodeLog.add(data.firewallId, `Firewall: Denegada ${data.fromName} → ${data.toName}`, 'firewall', Date.now());
+      }
+      if (data.firewallId && data.decision) {
+        this.nodeAnimations.trigger(data.firewallId, data.decision);
+      }
+    });
+
     this.socket.on('packet', (data) => {
       if (data.path && data.path.length > 1) {
         this.animator.animate(data.path);
       }
       if (data.nodeLogs) {
         console.log('[Teacher] nodeLogs recibidos:', data.nodeLogs.length);
+        for (const entry of data.nodeLogs) {
+          this.nodeLog.add(entry.nodeId, entry.text, entry.type, entry.timestamp);
+        }
+      }
+    });
+
+    this.socket.on('dns-query', (data) => {
+      console.log('[Teacher] dns-query recibido:', data);
+      if (data.path && data.path.length > 1) {
+        this.animator.animateDnsQuery(data.path, null);
+      }
+      if (data.nodeLogs) {
+        console.log('[Teacher] dns nodeLogs recibidos:', data.nodeLogs.length);
         for (const entry of data.nodeLogs) {
           this.nodeLog.add(entry.nodeId, entry.text, entry.type, entry.timestamp);
         }
@@ -282,6 +310,7 @@ class TeacherDashboard {
       animator: this.animator,
       theme: theme,
       topology: this.state.topology,
+      animationManager: this.nodeAnimations,
     });
   }
 

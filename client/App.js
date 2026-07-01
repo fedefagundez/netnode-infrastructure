@@ -209,8 +209,38 @@ class App {
     };
 
     this.client.onDnsResponse = (data) => {
+      console.log('[App] onDnsResponse:', data);
       if (this.chatPanel) {
         this.chatPanel.onDnsResponse(data);
+      }
+    };
+
+    this.client.onDnsQuery = (data) => {
+      console.log('[App] onDnsQuery:', data);
+      if (data.nodeLogs && this.renderer) {
+        console.log('[App] dns nodeLogs recibidos:', data.nodeLogs.length);
+        for (const entry of data.nodeLogs) {
+          this.renderer.nodeLog.add(entry.nodeId, entry.text, entry.type, entry.timestamp);
+        }
+      }
+      if (this.renderer && this.renderer.animator && data.path) {
+        this.renderer.animator.animateDnsQuery(data.path, null);
+        this.renderer.animator.onClientDnsComplete = () => {
+          console.log('[App] onClientDnsComplete called');
+          if (this.chatPanel) {
+            this.chatPanel.sendPendingDnsMessage();
+          }
+        };
+      }
+    };
+
+    this.client.onFirewallDecision = (data) => {
+      console.log('[App] onFirewallDecision:', data);
+      if (data.decision === 'reject' && this.renderer) {
+        this.renderer.nodeLog.add(data.firewallId, `Firewall: Denegada ${data.fromName} → ${data.toName}`, 'firewall', Date.now());
+      }
+      if (this.renderer && data.firewallId && data.decision) {
+        this.renderer.nodeAnimations.trigger(data.firewallId, data.decision);
       }
     };
 
@@ -249,7 +279,7 @@ class App {
   }
 
   initChat() {
-    this.chatPanel = new ChatPanel(this.receiveMessage, this.sentMessage, this.sendMessage, this.toggleNode, this.client);
+    this.chatPanel = new ChatPanel(this.receiveMessage, this.sentMessage, this.sendMessage, this.toggleNode, this.client, this.renderer);
     this.chatPanel.updateContacts(this.network.nodes, this.client.getMyNodeId());
     this.chatPanel.storeContext(this.network.nodes, this.client.getMyNodeId());
   }
