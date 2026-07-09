@@ -1,9 +1,6 @@
 FROM node:20-slim
-WORKDIR /app/server
-COPY server/package.json server/package-lock.json ./
-RUN npm install --omit=dev
-COPY server/ .
-COPY client/ ../client/
-COPY index.html ../index.html
+WORKDIR /app
+COPY . .
+RUN npm install --prefix server --omit=dev
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["npm", "start", "--prefix", "server"]
